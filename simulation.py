@@ -17,16 +17,14 @@ def run_simulation(is_payday=False, initial_cash=10000):
     if is_payday:
         arr_lambda = config.PAYDAY_LAMBDA
         srv_mean = config.PAYDAY_SERVICE_TIME_MIN
-        avg_wd = config.PAYDAY_AVG_WITHDRAWAL
         wd_amounts = [20, 50, 100, 200]
-        # Weighted higher for payday (closer to payday average)
+        # Weighted higher for payday
         wd_probs = [0.1, 0.2, 0.4, 0.3] 
     else:
         arr_lambda = config.NORMAL_LAMBDA
         srv_mean = config.NORMAL_SERVICE_TIME_MIN
-        avg_wd = config.NORMAL_AVG_WITHDRAWAL
         wd_amounts = [20, 50, 100, 200]
-        # Weighted lower for normal day (closer to normal average)
+        # Weighted lower for normal day
         wd_probs = [0.4, 0.3, 0.2, 0.1]
         
     max_minutes = 540
@@ -52,22 +50,22 @@ def run_simulation(is_payday=False, initial_cash=10000):
         
         # 3. If ATM is free and queue > 0, serve one customer
         if minute >= server_busy_until and queue_length > 0:
-            # 4. Service time using exponential distribution
-            service_time = np.random.exponential(srv_mean)
+            # 4. Service time using exponential distribution (Discrete-time fix)
+            service_time = max(1, int(np.random.exponential(srv_mean)))
             server_busy_until = minute + service_time
             
             queue_length -= 1
             total_customers_served += 1
             
-            # 5 & 6. Each served customer withdraws money, deduct from current_cash
+            # 5 & 6. Withdraw money and check cash limits
             wd = np.random.choice(wd_amounts, p=wd_probs)
-            current_cash -= wd
             
-            # Stop if cash runs out
-            if current_cash <= 0:
+            if current_cash >= wd:
+                current_cash -= wd
+            else:
+                # Prevent withdrawal if ATM cash is insufficient
                 current_cash = 0
                 cash_out_time = minute
-                # Save state for the minute of failure
                 queue_length_history.append(queue_length)
                 cash_vault_history.append(current_cash)
                 break
@@ -80,10 +78,13 @@ def run_simulation(is_payday=False, initial_cash=10000):
         queue_length_history.append(queue_length)
         cash_vault_history.append(current_cash)
 
+    # Correct unserved customer statistics
+    total_customers_unserved = total_customers_arrived - total_customers_served
+
     stats = {
         "total_customers_arrived": total_customers_arrived,
         "total_customers_served": total_customers_served,
-        "total_customers_unserved": queue_length,
+        "total_customers_unserved": total_customers_unserved,
         "max_queue_length": max_q_len,
         "cash_out_time": cash_out_time
     }
