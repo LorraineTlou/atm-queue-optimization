@@ -7,7 +7,7 @@ def get_optimal_cash(is_payday):
     print(f"\n🚀 Starting Optimization (Payday Mode = {is_payday})")
     
     test_cash = 5000       # We start testing at $5,000
-    max_cash = 50000       # We stop testing at $50,000
+    max_cash = 150000       # We stop testing at $50,000
     simulations = 1000     # Monte Carlo rule: run it 1,000 times
     
     while test_cash <= max_cash:
