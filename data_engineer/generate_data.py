@@ -9,8 +9,8 @@ end_time = datetime(2025, 1, 1, 17, 0, 0)
 total_seconds = (end_time - base_time).total_seconds()
 
 def generate_stream(day_type, rate_per_minute, service_mean, service_std,
-                    withdrawal_mean, withdrawal_std):
-    """Generate one clean Poisson arrival stream."""
+                    withdrawal_mean, withdrawal_std, outlier_pct=0.0):
+    """Generate one clean Poisson arrival stream with optional large-withdrawal outliers."""
     records = []
     current = 0  # seconds from start
 
@@ -24,9 +24,14 @@ def generate_stream(day_type, rate_per_minute, service_mean, service_std,
 
         arrival = base_time + timedelta(seconds=current)
         service = max(10, np.random.normal(loc=service_mean, scale=service_std))
-        withdrawal = round(float(np.clip(
-            np.random.normal(loc=withdrawal_mean, scale=withdrawal_std), 10, 500
-        )), 2)
+        
+        # Mixture model: small chance of a large "salary collection" withdrawal
+        if np.random.random() < outlier_pct:
+            withdrawal = round(float(np.random.uniform(500, 1000)), 2)
+        else:
+            withdrawal = round(float(np.clip(
+                np.random.normal(loc=withdrawal_mean, scale=withdrawal_std), 10, 500
+            )), 2)
 
         records.append({
             'arrival_time': arrival,
@@ -41,19 +46,21 @@ def generate_stream(day_type, rate_per_minute, service_mean, service_std,
 normal_records = generate_stream(
     day_type='Normal',
     rate_per_minute=2,        # 2 customers per minute
-    service_mean=60,
-    service_std=15,
+    service_mean=45,          # 45 sec — realistic ATM transaction
+    service_std=12,
     withdrawal_mean=50,
-    withdrawal_std=20
+    withdrawal_std=20,
+    outlier_pct=0.03          # 3% chance of $500–$1,000 withdrawal
 )
 
 payday_records = generate_stream(
     day_type='Payday',
     rate_per_minute=5,        # 5 customers per minute
-    service_mean=180,
-    service_std=40,
+    service_mean=75,          # 75 sec — larger amounts, balance checks
+    service_std=20,
     withdrawal_mean=120,
-    withdrawal_std=40
+    withdrawal_std=40,
+    outlier_pct=0.08          # 8% chance of $500–$1,000 salary collection
 )
 
 # Sample 30% of normal and 70% of payday to reflect realistic day mix
